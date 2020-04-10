@@ -40,4 +40,4 @@ for filename in os.listdir('cars/images/hatchback'):
     if(pred[0][0] > 0.9):
         c2 += 1
     print("Hatchback", pred)
-print("Correct", c2)
+print("Correct", c1, c2)
