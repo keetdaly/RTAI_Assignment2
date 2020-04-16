@@ -1,7 +1,5 @@
 from keras.preprocessing import image
 from tensorflow.keras.models import model_from_json
-#import keras.backend.tensorflow_backend as tb
-#tb._SYMBOLIC_SCOPE.value = True
 from enum import Enum
 import cv2
 import numpy as np
@@ -28,7 +26,6 @@ class Colour(Enum):
     WHITE = 4
     BLUE = 5
 
-
 # Class to read video, put each frame into queue for pipeline to read
 class VideoReader(threading.Thread):
     def __init__(self, group=None, target=None, name=None,
@@ -52,6 +49,8 @@ class VideoReader(threading.Thread):
                 while diff < self.fps:
                     diff = time.time() - start
             else:
+                # End of video, lets cascade know so loops can be exited
+                frameQueue.put(([], 0))
                 break
                 
 # Class for detecting cars
@@ -74,11 +73,25 @@ class ObjectDetector(threading.Thread):
         return classes
     
     def run(self):
+        event_extraction_times = []
         while True:
             if not frameQueue.empty():
                 frame, frameNo = frameQueue.get()
+                if frameNo == 0:
+                    # No more frames to process
+                    # Tell cascade no more frames to process
+                    # Break from loop to write to file
+                    carQueue.put((frame, [], frameNo))
+                    break
+                # Time in milliseconds
+                start_milli = int(time.time() * 1000)
                 cars = self.processFrame(frame)
+                extraction_time_milli = int(time.time() * 1000) - start_milli
+                event_extraction_times.append(extraction_time_milli)
+                
                 for car, box in cars:
+                    # Some bounding boxes may have invalid dimensions and cause
+                    # MobileNet to crash
                     if car.shape[0] <= 0 or car.shape[1] <= 0:
                         print("Invalid dimensions... removing car from list")
                         cars.remove((car, box))
@@ -86,14 +99,22 @@ class ObjectDetector(threading.Thread):
                     # Car detected, push through pipeline
                     carQueue.put((frame, cars, frameNo))
                 else:
-                    # No car, save frame as is
+                    # No car
+                    # Let cascade know that no car detected -> set extraction time to 0 
+                    # This allows timestamps in lists to be aligned by frame for processing
+                    carQueue.put((frame, cars, frameNo))
+                    # Save frame as is
                     f = f'frame{frameNo}.png'
                     cv2.imwrite(f, frame)
                     data = [frameNo] + [0] * 11
                     with open("predictions.csv","a") as f:
                         w = csv.writer(f)
                         w.writerow(data)
-                        
+        # No more frames to process, write extraction times to file for processing
+        with open("Q1_extraction_times.csv", "a") as f:
+            w = csv.writer(f)
+            w.writerow(event_extraction_times)
+            
                 
                 
     def processFrame(self, frame):
@@ -164,12 +185,32 @@ class TypeClassifier(threading.Thread):
         return img_tensor
     
     def run(self):
+        event_extraction_times = []
         while True:
             if not carQueue.empty():
                 frame, cars, frameNo = carQueue.get()
+                if frameNo == 0:
+                    # No more frames
+                    # Tell next classifier no more frames
+                    # Break from loop
+                    colourQueue.put((frame, cars, [], frameNo))
+                    break
+                if not cars:
+                    # No car in frame, no need to process
+                    # Set extraction time to 0, tell next classifier no car detected
+                    event_extraction_times.append(0.0)
+                    colourQueue.put((frame, cars, [], frameNo))
+                    continue
+                start_time_milli = int(time.time() * 1000)    
                 predictions = self.predictCar(cars)
-                colourQueue.put((frame, cars, predictions, frameNo))
+                extraction_time_milli = int(time.time() * 1000) - start_time_milli
+                event_extraction_times.append(extraction_time_milli)
                 
+                colourQueue.put((frame, cars, predictions, frameNo))
+        # Write timestamps to file for processing
+        with open("Q2_extraction_times.csv", "a") as f:
+            w = csv.writer(f)
+            w.writerow(event_extraction_times)
     
     def predictCar(self, cars):
         # Use MobileNet to predict Hatchback or Sedan for cars detected in each frame
@@ -199,12 +240,28 @@ class ColourClassifier(threading.Thread):
         return [blackRange, silverRange, redRange, whiteRange, blueRange]
         
     def run(self):
+        event_extraction_times = []
         while True:
             if not colourQueue.empty():
                 frame, cars, predictions, frameNo = colourQueue.get()
+                if frameNo == 0:
+                    # No more frames
+                    # Tell output no more frames
+                    outputQueue.put((frame, cars, predictions, [], frameNo))
+                    break
+                if not cars:
+                    # No cars detected
+                    # Set extraction time to 0
+                    event_extraction_times.append(0.0)
+                    continue
+                start_time_milli = int(time.time() * 1000)
                 colours = self.classify_colour(cars)
+                extraction_time_milli = int(time.time() * 1000) - start_time_milli
+                event_extraction_times.append(extraction_time_milli)
                 outputQueue.put((frame, cars, predictions, colours, frameNo))
-                
+        with open("Q3_extraction_times.csv", "a") as f:
+            w = csv.writer(f)
+            w.writerow(event_extraction_times)
                 
     
     def classify_colour(self, cars):
@@ -241,7 +298,9 @@ class Output(threading.Thread):
         while True:
             if not outputQueue.empty():
                 frame, cars, predictions, colours, frameNo = outputQueue.get()
-                
+                if frameNo == 0:
+                    # No more frames
+                    break
                 for c, prediction, colour in zip(cars, predictions, colours):
                     car, box = c
                     x,y,w,h = box
@@ -270,8 +329,6 @@ class Output(threading.Thread):
                     w = csv.writer(f)
                     w.writerow(data)
                 
-                
-
 if __name__ == "__main__":
     VR = VideoReader(name="VideoReader")
     OD = ObjectDetector(name="ObjectDetector")
