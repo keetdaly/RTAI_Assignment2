@@ -9,14 +9,13 @@ Q2_res = defaultdict(int)
 Q3_res = defaultdict(int)
 
 TOTAL_FRAMES = 1495
-Q1_times, Q2_times, Q3_times = []
 
 # Method to plot the bar graph for the F1 score and Throughput
 def bar_plot(x_values, y_values, title, xlabel, ylabel):
     plt.bar(x_values, y_values, width = 0.5)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.savefig(title + ".jpg")
+    plt.savefig(title + ".png")
     plt.show()
     plt.close()
 
@@ -25,7 +24,7 @@ def plot(values, title, xlabel, ylabel):
     plt.plot(values)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.savefig(title + ".jpg")
+    plt.savefig(title + ".png")
     plt.show()
     plt.close()
 
@@ -47,7 +46,7 @@ def calculate_F1s():
     gt_hatchback = np.squeeze(ground_truth.to_numpy().astype(float)[np.nonzero(gt_cars_frame), 6:-1], axis=0)
 
     # Calculate F1 scores for Query 1
-    for i in range(len(gt_cars_frame)):
+    for i in range(len(gt_cars_frame)-1):
         predicted = predicted_cars_frame[i]
         gt = gt_cars_frame[i]
         if predicted < gt:
@@ -170,8 +169,7 @@ def calculate_F1s():
 
     return [F11, F12, F13]
 
-# Method to calculate the throughput for each of the query
-def calculate_throughputs():
+def init_extraction_times():
     # Extraction times
     Q1_times = np.genfromtxt("Q1_extraction_times.csv", delimiter=",")
     E2_times = np.genfromtxt("Q2_extraction_times.csv", delimiter=",")
@@ -182,7 +180,10 @@ def calculate_throughputs():
 
     # Query 3: sum of times of Query 2 and E3 which is time to classify colour
     Q3_times = Q2_times + E3_times
+    return (Q1_times, Q2_times, Q3_times)
 
+# Method to calculate the throughput for each of the query
+def calculate_throughputs(Q1_times, Q2_times, Q3_times):
     total_time_Q1 = np.sum(Q1_times) / 1000
     total_time_Q2 = np.sum(Q2_times) / 1000
     total_time_Q3 = np.sum(Q3_times) / 1000
@@ -194,10 +195,15 @@ def calculate_throughputs():
     return [throughput_Q1, throughput_Q2, throughput_Q3]
 
 if __name__ == "__main__":
+    # Initializing extraction times for performance evaluation
+    Q1_times, Q2_times, Q3_times = init_extraction_times()
+
     # Computing the F1 score and throughput for all the queries
     queries = ["Query 1", "Query 2", "Query 3"]
     F1s = calculate_F1s()
-    Ts = calculate_throughputs()
+    print(F1s)
+    Ts = calculate_throughputs(Q1_times, Q2_times, Q3_times)
+    print(Ts)
 
     # Plotting the F1 score and throughput in bar graph
     bar_plot(queries, F1s, "F1_scores", "Queries", "F1 Score")

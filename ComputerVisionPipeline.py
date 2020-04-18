@@ -110,7 +110,7 @@ class ObjectDetector(threading.Thread):
                     # This allows timestamps in lists to be aligned by frame for processing
                     carQueue.put((frame, cars, frameNo))
                     # Save frame as is
-                    f = f'frame{frameNo}.png'
+                    f = f'results/frame{frameNo}.png'
                     cv2.imwrite(f, frame)
                     data = [frameNo] + [0] * 11
 
@@ -328,7 +328,7 @@ class Output(threading.Thread):
                     cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
                     cv2.putText(frame, label, (x, y + 85), font, color, 3)
                 
-                filename = f'frame{frameNo}.png'
+                filename = f'results/frame{frameNo}.png'
                 cv2.imwrite(filename, frame)
             
                 h = HATCHBACK.copy()
