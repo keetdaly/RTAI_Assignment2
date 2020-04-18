@@ -70,8 +70,7 @@ def calculate_F1s():
 
     P1 = Q1_res["TP"]/(Q1_res["TP"] + Q1_res["FP"])
     R1 = Q1_res["TP"]/(Q1_res["TP"] + Q1_res["FN"])
-    F11 = (2 * P1 * R1)/(P1 + R1)
-
+    F11 = round((2 * P1 * R1)/(P1 + R1),2)
 
     # Calculate F1 scores for Query 2
     rows, cols = sedans_predict.shape
@@ -120,7 +119,7 @@ def calculate_F1s():
 
     P2 = Q2_res["TP"]/(Q2_res["TP"] + Q2_res["FP"])
     R2 = Q2_res["TP"]/(Q2_res["TP"] + Q2_res["FN"])
-    F12 = (2 * P2 * R2)/(P2 + R2)
+    F12 = round((2 * P2 * R2)/(P2 + R2),2)
 
     #  Calculate F1 scores for Query 3
     for i in range(rows):
@@ -165,7 +164,7 @@ def calculate_F1s():
 
     P3 = Q3_res["TP"]/(Q3_res["TP"] + Q3_res["FP"])
     R3 = Q3_res["TP"]/(Q3_res["TP"] + Q3_res["FN"])
-    F13 = (2 * P3 * R3)/(P3 + R3)
+    F13 = round((2 * P3 * R3)/(P3 + R3),2)
 
     return [F11, F12, F13]
 
@@ -188,25 +187,28 @@ def calculate_throughputs(Q1_times, Q2_times, Q3_times):
     total_time_Q2 = np.sum(Q2_times) / 1000
     total_time_Q3 = np.sum(Q3_times) / 1000
 
-    throughput_Q1 = TOTAL_FRAMES / total_time_Q1
-    throughput_Q2 = TOTAL_FRAMES / total_time_Q2
-    throughput_Q3 = TOTAL_FRAMES / total_time_Q3
+    throughput_Q1 = round(TOTAL_FRAMES / total_time_Q1, 2)
+    throughput_Q2 = round(TOTAL_FRAMES / total_time_Q2, 2)
+    throughput_Q3 = round(TOTAL_FRAMES / total_time_Q3, 2)
 
     return [throughput_Q1, throughput_Q2, throughput_Q3]
 
 if __name__ == "__main__":
     # Initializing extraction times for performance evaluation
     Q1_times, Q2_times, Q3_times = init_extraction_times()
+    ETs = (np.sum(Q1_times)/1000, np.sum(Q2_times)/1000, np.sum(Q3_times)/1000)
+    print("Query Extraction Times: ",ETs)
 
     # Computing the F1 score and throughput for all the queries
     queries = ["Query 1", "Query 2", "Query 3"]
     F1s = calculate_F1s()
-    print(F1s)
+    print("F1 scores: ",F1s)
     Ts = calculate_throughputs(Q1_times, Q2_times, Q3_times)
-    print(Ts)
+    print("Query Throughputs: ",Ts)
 
     # Plotting the F1 score and throughput in bar graph
     bar_plot(queries, F1s, "F1_scores", "Queries", "F1 Score")
+    bar_plot(queries, ETs, "Extraction Times", "Queries", "Extraction Time")
     bar_plot(queries, Ts, "Throughputs", "Queries", "Throughput (frame/s)")
 
     # Plotting the line graph for the event extraction time for
